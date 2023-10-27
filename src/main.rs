@@ -1,4 +1,4 @@
-use serde_json;
+use serde_json::{self, Map, Value};
 use std::env;
 
 // use serde_bencode
@@ -8,6 +8,34 @@ fn decode_bencoded_value(encoded_value: &str) -> (serde_json::Value, &str) {
     let next = encoded_value.chars().next().unwrap();
     if next == 'e' {
         (serde_json::Value::Null, &encoded_value[1..])
+    } else if next == 'd' {
+        let mut remaining = &encoded_value[1..encoded_value.len()];
+        let mut dict = Map::new();
+
+        'dict: while !remaining.is_empty() {
+            let mut key: Value = Value::Null;
+
+            for _ in 0..2 {
+                let (decoded_value, new_remaining) = decode_bencoded_value(remaining);
+                remaining = new_remaining;
+
+                if decoded_value == serde_json::Value::Null {
+                    break 'dict;
+                }
+
+                match key {
+                    Value::String(ref str_key) => {
+                        dict.insert(str_key.as_str().into(), decoded_value);
+                    }
+                    _ => {
+                        key = decoded_value;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        (serde_json::Value::Object(dict), &remaining)
     } else if next == 'l' {
         let mut remaining = &encoded_value[1..encoded_value.len()];
         let mut list = Vec::new();
