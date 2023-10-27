@@ -6,21 +6,22 @@ use std::env;
 #[allow(dead_code)]
 fn decode_bencoded_value(encoded_value: &str) -> (serde_json::Value, &str) {
     let next = encoded_value.chars().next().unwrap();
-    if next == 'l' {
-        let list_string = &encoded_value[1..encoded_value.len() - 1];
+    if next == 'e' {
+        (serde_json::Value::Null, &encoded_value[1..])
+    } else if next == 'l' {
+        let mut remaining = &encoded_value[1..encoded_value.len()];
         let mut list = Vec::new();
 
-        let mut remaining = list_string;
         while !remaining.is_empty() {
             let (decoded_value, new_remaining) = decode_bencoded_value(remaining);
-            list.push(decoded_value);
             remaining = new_remaining;
+            if decoded_value == serde_json::Value::Null {
+                break;
+            }
+            list.push(decoded_value);
         }
 
-        (
-            serde_json::Value::Array(list),
-            &encoded_value[encoded_value.len()..],
-        )
+        (serde_json::Value::Array(list), &remaining)
     } else if next == 'i' {
         let e_index = encoded_value.find('e').unwrap();
         let number_string = &encoded_value[1..e_index];
