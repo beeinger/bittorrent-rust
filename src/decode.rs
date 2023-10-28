@@ -1,22 +1,14 @@
-use serde_bencode::from_bytes;
 use serde_bencode::value::Value as BencodeValue;
 use serde_json::{Map, Value};
 
-pub fn decode_serde_bencode(encoded_value: &[u8]) -> Result<Value, serde_bencode::Error> {
-    match from_bytes::<BencodeValue>(encoded_value) {
-        Ok(decoded_value) => Ok(convert_to_json_value(&decoded_value)),
-        Err(e) => Err(e),
-    }
-}
-
-fn convert_to_json_value(bvalue: &BencodeValue) -> Value {
+pub fn convert_bencode_decode_result_to_json_values(bvalue: &BencodeValue) -> Value {
     match bvalue {
         BencodeValue::Bytes(bytes) => Value::String(String::from_utf8_lossy(bytes).to_string()),
         BencodeValue::Int(i) => Value::Number((*i).into()),
         BencodeValue::List(list) => {
             let vec: Vec<Value> = list
                 .iter()
-                .map(|item| convert_to_json_value(item))
+                .map(|item| convert_bencode_decode_result_to_json_values(item))
                 .collect();
             Value::Array(vec)
         }
@@ -25,7 +17,7 @@ fn convert_to_json_value(bvalue: &BencodeValue) -> Value {
             for (key, value) in dict {
                 map.insert(
                     String::from_utf8_lossy(key).to_string(),
-                    convert_to_json_value(value),
+                    convert_bencode_decode_result_to_json_values(value),
                 );
             }
             Value::Object(map)
