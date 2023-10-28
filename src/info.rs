@@ -23,7 +23,7 @@ pub struct Info {
 }
 
 impl Info {
-    pub fn hash(&self) -> String {
+    pub fn get_hash(&self) -> String {
         let bencoded_info = to_bytes(&self).unwrap();
 
         let mut hasher = Sha1::new();
@@ -31,16 +31,33 @@ impl Info {
         let hash: [u8; 20] = hasher.finalize().into();
         hex::encode(hash)
     }
+
+    pub fn get_piece_hashes(&self) -> Vec<String> {
+        let mut piece_hashes: Vec<String> = Vec::new();
+        let mut curr_piece: Vec<u8> = Vec::new();
+
+        for (i, byte) in self.pieces.iter().enumerate() {
+            curr_piece.push(byte.to_owned());
+            if (i + 1) % 20 == 0 {
+                piece_hashes.push(hex::encode(curr_piece));
+                curr_piece = Vec::new();
+            }
+        }
+
+        piece_hashes
+    }
 }
 
 impl Display for Metadata {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Tracker URL: {}\nLength: {}\nInfo Hash: {}",
+            "Tracker URL: {}\nLength: {}\nInfo Hash: {}\nPiece Length: {}\nPiece Hashes:\n{}",
             self.announce,
             self.info.length,
-            self.info.hash()
+            self.info.get_hash(),
+            self.info.piece_length,
+            self.info.get_piece_hashes().join("\n")
         )
     }
 }
