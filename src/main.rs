@@ -1,13 +1,16 @@
+use serde_bencode::{from_bytes, value::Value};
 use std::env;
 
 mod decode;
 mod info;
+mod peers;
 
 use decode::convert_bencode_decode_result_to_json_values;
 use info::get_info;
-use serde_bencode::{from_bytes, value::Value};
+use peers::get_peers;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() != 3 {
         println!("Usage: your_program decode '<encoded_value>'");
@@ -25,6 +28,7 @@ fn main() {
             Err(e) => println!("Error: {}", e),
         },
         "info" => println!("{}", get_info(parameter)),
+        "peers" => println!("{}", get_peers(parameter).await.join("\n")),
         _ => println!("unknown command: {}", command),
     }
 }

@@ -8,28 +8,32 @@ use std::fmt::Display;
 
 #[derive(Debug, Deserialize)]
 pub struct Metadata {
-    announce: String,
-    info: Info,
+    pub announce: String,
+    pub info: Info,
 }
 
 #[allow(dead_code)]
 #[derive(Serialize, Debug, Deserialize)]
 pub struct Info {
-    name: String,
+    pub name: String,
     #[serde(rename = "piece length")]
-    piece_length: u32,
-    pieces: ByteBuf,
-    length: u32,
+    pub piece_length: u32,
+    pub pieces: ByteBuf,
+    pub length: u32,
 }
 
 impl Info {
-    pub fn get_hash(&self) -> String {
+    pub fn get_hash(&self) -> [u8; 20] {
         let bencoded_info = to_bytes(&self).unwrap();
 
         let mut hasher = Sha1::new();
         hasher.update(bencoded_info);
         let hash: [u8; 20] = hasher.finalize().into();
-        hex::encode(hash)
+        hash
+    }
+
+    pub fn get_hex_hash(&self) -> String {
+        hex::encode(self.get_hash())
     }
 
     pub fn get_piece_hashes(&self) -> Vec<String> {
@@ -55,7 +59,7 @@ impl Display for Metadata {
             "Tracker URL: {}\nLength: {}\nInfo Hash: {}\nPiece Length: {}\nPiece Hashes:\n{}",
             self.announce,
             self.info.length,
-            self.info.get_hash(),
+            self.info.get_hex_hash(),
             self.info.piece_length,
             self.info.get_piece_hashes().join("\n")
         )
