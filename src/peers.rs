@@ -3,6 +3,33 @@ use serde::{self, Deserialize, Serialize};
 use serde_bencode::from_bytes;
 use serde_bytes::ByteBuf;
 
+pub async fn get_peers(path: &str) -> Vec<String> {
+    let metadata = info::get_info(path);
+
+    let dicover_peers_query = DiscoverPeersQuery::new(
+        "21372137696921372137".to_string(),
+        6881,
+        0,
+        0,
+        metadata.info.length,
+        1,
+        metadata.info.get_hash(),
+    );
+
+    let res = reqwest::get(format!(
+        "{}?{}",
+        metadata.announce,
+        dicover_peers_query.get_query_string()
+    ))
+    .await
+    .unwrap();
+
+    let bytes = res.bytes().await.unwrap();
+    let decoded = from_bytes::<DiscoverPeersResponse>(&bytes).unwrap();
+
+    decoded.get_peers()
+}
+
 #[derive(Serialize, Deserialize)]
 struct DiscoverPeersQuery {
     peer_id: String,
@@ -15,6 +42,26 @@ struct DiscoverPeersQuery {
 }
 
 impl DiscoverPeersQuery {
+    pub fn new(
+        peer_id: String,
+        port: u32,
+        uploaded: u32,
+        downloaded: u32,
+        left: u32,
+        compact: u32,
+        info_hash: [u8; 20],
+    ) -> Self {
+        Self {
+            peer_id,
+            port,
+            uploaded,
+            downloaded,
+            left,
+            compact,
+            info_hash: urlencode(&info_hash),
+        }
+    }
+
     pub fn get_query_string(&self) -> String {
         serde_urlencoded::to_string(self)
             .unwrap()
@@ -25,6 +72,15 @@ impl DiscoverPeersQuery {
             + "info_hash="
             + &self.info_hash
     }
+}
+
+fn urlencode(t: &[u8; 20]) -> String {
+    let mut encoded = String::with_capacity(3 * t.len());
+    for &byte in t {
+        encoded.push('%');
+        encoded.push_str(&hex::encode(&[byte]));
+    }
+    encoded
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -59,40 +115,4 @@ impl DiscoverPeersResponse {
 
         peers
     }
-}
-
-pub async fn get_peers(path: &str) -> Vec<String> {
-    let metadata = info::get_info(path);
-
-    let dicover_peers_query = DiscoverPeersQuery {
-        info_hash: urlencode(&metadata.info.get_hash()),
-        peer_id: "21372137696921372137".to_string(),
-        port: 6881,
-        uploaded: 0,
-        downloaded: 0,
-        left: metadata.info.length,
-        compact: 1,
-    };
-
-    let res = reqwest::get(format!(
-        "{}?{}",
-        metadata.announce,
-        dicover_peers_query.get_query_string()
-    ))
-    .await
-    .unwrap();
-
-    let bytes = res.bytes().await.unwrap();
-    let decoded = from_bytes::<DiscoverPeersResponse>(&bytes).unwrap();
-
-    decoded.get_peers()
-}
-
-fn urlencode(t: &[u8; 20]) -> String {
-    let mut encoded = String::with_capacity(3 * t.len());
-    for &byte in t {
-        encoded.push('%');
-        encoded.push_str(&hex::encode(&[byte]));
-    }
-    encoded
 }

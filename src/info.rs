@@ -6,6 +6,11 @@ use std::fs;
 
 use std::fmt::Display;
 
+pub fn get_info(path: &str) -> Metadata {
+    let contents: Vec<u8> = fs::read(path).unwrap();
+    from_bytes::<Metadata>(&contents).unwrap()
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Metadata {
     pub announce: String,
@@ -64,9 +69,4 @@ impl Display for Metadata {
             self.info.get_piece_hashes().join("\n")
         )
     }
-}
-
-pub fn get_info(path: &str) -> Metadata {
-    let contents: Vec<u8> = fs::read(path).unwrap();
-    from_bytes::<Metadata>(&contents).unwrap()
 }
