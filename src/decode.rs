@@ -2,8 +2,8 @@ use serde_bencode::from_bytes;
 use serde_bencode::value::Value as BencodeValue;
 use serde_json::{Map, Value};
 
-pub fn decode_serde_bencode(encoded_value: &str) -> Result<Value, serde_bencode::Error> {
-    match from_bytes::<BencodeValue>(encoded_value.as_bytes()) {
+pub fn decode_serde_bencode(encoded_value: &[u8]) -> Result<Value, serde_bencode::Error> {
+    match from_bytes::<BencodeValue>(encoded_value) {
         Ok(decoded_value) => Ok(convert_to_json_value(&decoded_value)),
         Err(e) => Err(e),
     }

@@ -1,8 +1,10 @@
 use std::env;
 
 mod decode;
+mod info;
 
 use decode::decode_serde_bencode;
+use info::get_info;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -14,11 +16,11 @@ fn main() {
     let parameter = &args[2];
 
     match command.as_str() {
-        "decode" => match decode_serde_bencode(parameter) {
+        "decode" => match decode_serde_bencode(parameter.as_bytes()) {
             Ok(decoded) => println!("{}", decoded),
             Err(e) => println!("Error: {}", e),
         },
-        "info" => println!("info"),
+        "info" => println!("{}", get_info(parameter)),
         _ => println!("unknown command: {}", command),
     }
 }
