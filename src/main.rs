@@ -1,15 +1,17 @@
 use clap::Parser;
-use handshake::get_handshake;
 use serde_bencode::from_bytes;
 
 mod cli;
 mod decode;
+mod download_piece;
 mod handshake;
 mod info;
 mod peers;
 
 use cli::Cli;
 use decode::BencodeValue;
+use download_piece::download_piece;
+use handshake::get_handshake;
 use info::get_info;
 use peers::get_peers;
 
@@ -26,21 +28,29 @@ async fn main() {
         ),
         Some(cli::Commands::Info { torrent_file }) => println!("{}", get_info(torrent_file)),
         Some(cli::Commands::Peers { torrent_file }) => {
-            println!("{}", get_peers(torrent_file).await.join("\n"))
+            println!("{}", {
+                let metadata = info::get_info(torrent_file);
+                get_peers(metadata).await.join("\n")
+            })
         }
         Some(cli::Commands::Handshake { torrent_file, peer }) => {
-            println!("Peer ID: {}", get_handshake(torrent_file, &peer).await.0)
+            println!("Peer ID: {}", {
+                let metadata = info::get_info(torrent_file);
+                get_handshake(metadata, &peer).await.0
+            })
         }
         Some(cli::Commands::DownloadPiece {
             torrent_file,
             piece_index,
             output_path,
-        }) => println!(
-            "{}: Piece {} downloaded to {}.",
-            torrent_file.to_str().unwrap(),
-            piece_index,
-            output_path.to_str().unwrap()
-        ),
+        }) => {
+            download_piece(torrent_file, piece_index, output_path.clone()).await;
+            println!(
+                "Piece {} downloaded to {}.",
+                piece_index,
+                output_path.to_str().unwrap()
+            );
+        }
         None => println!("No command provided"),
     }
 }

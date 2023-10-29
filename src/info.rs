@@ -12,14 +12,14 @@ pub fn get_info(path: PathBuf) -> Metadata {
     from_bytes::<Metadata>(&contents).unwrap()
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Metadata {
     pub announce: String,
     pub info: Info,
 }
 
 #[allow(dead_code)]
-#[derive(Serialize, Debug, Deserialize)]
+#[derive(Serialize, Debug, Deserialize, Clone)]
 pub struct Info {
     pub name: String,
     #[serde(rename = "piece length")]

@@ -34,6 +34,7 @@ pub enum Commands {
         peer: String,
     },
     /// Downloads a piece from a torrent file
+    #[command(name = "download_piece")]
     DownloadPiece {
         /// A torrent file to decode
         torrent_file: PathBuf,

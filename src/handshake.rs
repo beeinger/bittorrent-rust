@@ -1,19 +1,24 @@
-use crate::info::{self, Metadata};
+use tokio::io::AsyncReadExt;
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
 
-use std::io::{Read, Write};
-use std::net::TcpStream;
-use std::path::PathBuf;
+use crate::info::Metadata;
 
-pub async fn get_handshake(path: PathBuf, peer: &str) -> (String, TcpStream) {
-    let metadata = info::get_info(path);
+pub async fn get_handshake(metadata: Metadata, peer: &str) -> (String, TcpStream) {
     let handshake = construct_handshake(metadata);
 
-    let mut stream = TcpStream::connect(peer).expect("Could not connect to server");
-    stream.write(&handshake).expect("Failed to send message");
+    let mut stream = TcpStream::connect(peer)
+        .await
+        .expect("Could not connect to server");
+    stream
+        .write(&handshake)
+        .await
+        .expect("Failed to send message");
 
     let mut buffer = [0; 68];
     stream
         .read(&mut buffer)
+        .await
         .expect("Failed to read from server");
 
     (
