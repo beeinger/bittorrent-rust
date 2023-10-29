@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
 
-pub async fn get_handshake(path: PathBuf, peer: &str) -> String {
+pub async fn get_handshake(path: PathBuf, peer: &str) -> (String, TcpStream) {
     let metadata = info::get_info(path);
     let handshake = construct_handshake(metadata);
 
@@ -16,11 +16,14 @@ pub async fn get_handshake(path: PathBuf, peer: &str) -> String {
         .read(&mut buffer)
         .expect("Failed to read from server");
 
-    buffer[48..]
-        .iter()
-        .map(|byte| format!("{:02x}", byte))
-        .collect::<Vec<String>>()
-        .join("")
+    (
+        buffer[48..]
+            .iter()
+            .map(|byte| format!("{:02x}", byte))
+            .collect::<Vec<String>>()
+            .join(""),
+        stream,
+    )
 }
 
 fn construct_handshake(metadata: Metadata) -> Vec<u8> {

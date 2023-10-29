@@ -29,7 +29,7 @@ async fn main() {
             println!("{}", get_peers(torrent_file).await.join("\n"))
         }
         Some(cli::Commands::Handshake { torrent_file, peer }) => {
-            println!("Peer ID: {}", get_handshake(torrent_file, &peer).await)
+            println!("Peer ID: {}", get_handshake(torrent_file, &peer).await.0)
         }
         Some(cli::Commands::DownloadPiece {
             torrent_file,
