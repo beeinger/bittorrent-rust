@@ -1,26 +1,34 @@
-use serde_bencode::value::Value as BencodeValue;
+use serde::{Deserialize, Serialize};
+use serde_bencode::value::Value as ExternalBencodeValue;
 use serde_json::{Map, Value};
 
-pub fn convert_bencode_decode_result_to_json_values(bvalue: &BencodeValue) -> Value {
-    match bvalue {
-        BencodeValue::Bytes(bytes) => Value::String(String::from_utf8_lossy(bytes).to_string()),
-        BencodeValue::Int(i) => Value::Number((*i).into()),
-        BencodeValue::List(list) => {
-            let vec: Vec<Value> = list
-                .iter()
-                .map(|item| convert_bencode_decode_result_to_json_values(item))
-                .collect();
-            Value::Array(vec)
-        }
-        BencodeValue::Dict(dict) => {
-            let mut map = serde_json::map::Map::new();
-            for (key, value) in dict {
-                map.insert(
-                    String::from_utf8_lossy(key).to_string(),
-                    convert_bencode_decode_result_to_json_values(value),
-                );
+#[derive(Serialize, Deserialize)]
+pub struct BencodeValue(pub ExternalBencodeValue);
+
+impl BencodeValue {
+    pub fn to_json(&self) -> Value {
+        match &self.0 {
+            ExternalBencodeValue::Bytes(bytes) => {
+                Value::String(String::from_utf8_lossy(&bytes).to_string())
             }
-            Value::Object(map)
+            ExternalBencodeValue::Int(i) => Value::Number((*i).into()),
+            ExternalBencodeValue::List(list) => {
+                let vec: Vec<Value> = list
+                    .iter()
+                    .map(|item| BencodeValue(item.clone()).to_json())
+                    .collect();
+                Value::Array(vec)
+            }
+            ExternalBencodeValue::Dict(dict) => {
+                let mut map = serde_json::map::Map::new();
+                for (key, value) in dict {
+                    map.insert(
+                        String::from_utf8_lossy(key).to_string(),
+                        BencodeValue(value.clone()).to_json(),
+                    );
+                }
+                Value::Object(map)
+            }
         }
     }
 }

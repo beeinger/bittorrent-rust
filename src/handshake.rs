@@ -2,8 +2,9 @@ use crate::info::{self, Metadata};
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
+use std::path::PathBuf;
 
-pub async fn get_handshake(path: &str, peer: &str) -> String {
+pub async fn get_handshake(path: PathBuf, peer: &str) -> String {
     let metadata = info::get_info(path);
     let handshake = construct_handshake(metadata);
 

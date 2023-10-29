@@ -1,9 +1,11 @@
+use std::path::PathBuf;
+
 use crate::info;
 use serde::{self, Deserialize, Serialize};
 use serde_bencode::from_bytes;
 use serde_bytes::ByteBuf;
 
-pub async fn get_peers(path: &str) -> Vec<String> {
+pub async fn get_peers(path: PathBuf) -> Vec<String> {
     let metadata = info::get_info(path);
 
     let dicover_peers_query = DiscoverPeersQuery::new(
