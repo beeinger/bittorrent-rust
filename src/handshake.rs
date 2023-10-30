@@ -17,7 +17,7 @@ pub async fn get_handshake(metadata: Metadata, peer: &str) -> (String, TcpStream
 
     let mut buffer = [0; 68];
     stream
-        .read(&mut buffer)
+        .read_exact(&mut buffer)
         .await
         .expect("Failed to read from server");
 

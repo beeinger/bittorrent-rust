@@ -44,7 +44,9 @@ async fn main() {
             piece_index,
             output_path,
         }) => {
-            download_piece(torrent_file, piece_index, output_path.clone()).await;
+            download_piece(torrent_file, piece_index, output_path.clone())
+                .await
+                .expect("Failed to download piece");
             println!(
                 "Piece {} downloaded to {}.",
                 piece_index,
