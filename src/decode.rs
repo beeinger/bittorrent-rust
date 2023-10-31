@@ -9,7 +9,7 @@ impl BencodeValue {
     pub fn to_json(&self) -> Value {
         match &self.0 {
             ExternalBencodeValue::Bytes(bytes) => {
-                Value::String(String::from_utf8_lossy(&bytes).to_string())
+                Value::String(String::from_utf8_lossy(bytes).to_string())
             }
             ExternalBencodeValue::Int(i) => Value::Number((*i).into()),
             ExternalBencodeValue::List(list) => {
@@ -90,7 +90,7 @@ pub fn decode_bencoded_value(encoded_value: &str) -> (serde_json::Value, &str) {
             serde_json::Value::Number(number.into()),
             &encoded_value[e_index + 1..],
         )
-    } else if next.is_digit(10) {
+    } else if next.is_ascii_digit() {
         let colon_index = encoded_value.find(':').unwrap();
         let number_string = &encoded_value[..colon_index];
         let number = number_string.parse::<i64>().unwrap();

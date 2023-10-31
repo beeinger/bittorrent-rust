@@ -11,7 +11,7 @@ pub async fn get_handshake(metadata: Metadata, peer: &str) -> (String, TcpStream
         .await
         .expect("Could not connect to server");
     stream
-        .write(&handshake)
+        .write_all(&handshake)
         .await
         .expect("Failed to send message");
 

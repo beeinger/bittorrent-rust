@@ -76,7 +76,7 @@ fn urlencode(t: &[u8; 20]) -> String {
     let mut encoded = String::with_capacity(3 * t.len());
     for &byte in t {
         encoded.push('%');
-        encoded.push_str(&hex::encode(&[byte]));
+        encoded.push_str(&hex::encode([byte]));
     }
     encoded
 }
@@ -105,7 +105,7 @@ impl DiscoverPeersResponse {
                     curr_peer[1],
                     curr_peer[2],
                     curr_peer[3],
-                    (((curr_peer[4] as u16) << 8) + curr_peer[5] as u16).to_string()
+                    (((curr_peer[4] as u16) << 8) + curr_peer[5] as u16)
                 ));
                 curr_peer = Vec::new();
             }

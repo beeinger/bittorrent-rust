@@ -15,38 +15,46 @@ pub async fn download_piece(
     path: PathBuf,
     piece_index: usize,
     output_path: PathBuf,
-) -> Result<(), String> {
+) -> Result<(), std::io::Error> {
     let metadata = info::get_info(path.clone());
     let peers = peers::get_peers(metadata.clone()).await;
-    let piece_hash = metadata.info.get_piece_hashes()[piece_index].clone();
+    let piece_hashes = metadata.info.get_piece_hashes();
+
+    assert!(piece_index < piece_hashes.len(), "Piece index out of range");
+
+    let piece_hash = &piece_hashes[piece_index];
 
     //? Handshake
-    let (_, stream) = handshake::get_handshake(metadata.clone(), peers[0].as_str()).await;
+    let (_, mut stream) = handshake::get_handshake(metadata.clone(), peers[0].as_str()).await;
 
     //? Bitfield message
-    let (message, mut stream) = receive_message(stream).await;
+    let message = receive_message(&mut stream).await?;
     assert!(message.id == 5);
 
     //? Send interested message
     stream
-        .write(&[0, 0, 0, 1, 2])
+        .write_all(&[0, 0, 0, 1, 2])
         .await
         .expect("Failed to send message");
 
     //? Unchoke message
-    let (message, stream) = receive_message(stream).await;
+    let message = receive_message(&mut stream).await?;
     assert!(message.id == 1);
 
     //? Piece blocks messages to send
     let piece_blocks_messages = get_piece_blocks_messages(&metadata, piece_index as u32);
 
     //? Received piece blocks
-    let piece_blocks = receive_piece_blocks(stream, piece_blocks_messages).await;
+    let piece_blocks = receive_piece_blocks(&mut stream, piece_blocks_messages).await;
 
-    //? Combine piece blocks into piece
+    //? Combine piece blocks into piece=
     let mut piece = vec![0; metadata.info.piece_length as usize];
-    for block in piece_blocks {
-        let block = block.unwrap();
+    for block_enum in piece_blocks.iter().enumerate() {
+        let block = block_enum.1.clone().unwrap_or(Block {
+            piece_index: piece_index as u32,
+            begin: block_enum.0 as u32 * BLOCK_SIZE,
+            block: vec![0; BLOCK_SIZE as usize],
+        });
         let start = block.begin as usize;
         let mut block = block.block;
         let mut end = start + block.len();
@@ -63,17 +71,17 @@ pub async fn download_piece(
     let hash: [u8; 20] = hasher.finalize().into();
     let hash = hex::encode(hash);
 
-    assert!(hash == piece_hash, "Hashes do not match");
-
     tokio::fs::write(output_path, piece.clone())
         .await
         .expect("Failed to write piece");
+
+    assert_eq!(hash, *piece_hash, "Hashes do not match");
 
     Ok(())
 }
 
 async fn receive_piece_blocks(
-    mut stream: TcpStream,
+    stream: &mut TcpStream,
     piece_blocks_messages: Vec<Vec<u8>>,
 ) -> Vec<Option<Block>> {
     //? Save the number of chunks
@@ -81,23 +89,30 @@ async fn receive_piece_blocks(
     let piece_blocks_messages = &mut piece_blocks_messages.into_iter();
 
     //? Send first 5 requests
-    for _ in [0..5] {
+    for _ in 0..5 {
         if let Some(message) = piece_blocks_messages.next() {
             stream
-                .write(&message)
+                .write_all(&message)
                 .await
                 .expect("Failed to send message");
+            println!("Sent message {:?}", message);
         }
     }
 
     let mut blocks = vec![Option::None; number_of_chunks as usize];
-    while blocks.iter().any(|b| b.is_none()) {
-        let (message, passed_stream) = receive_message(stream).await;
-        stream = passed_stream;
-
-        if message.id != 7 {
-            continue;
-        }
+    for _ in 0..number_of_chunks {
+        let message = match receive_message(stream).await {
+            Ok(message) => {
+                if message.id != 7 {
+                    continue;
+                }
+                message
+            }
+            Err(e) => {
+                println!("Failed to receive message {}", e);
+                continue;
+            }
+        };
 
         let block = Block {
             piece_index: bytes_to_u32(&message.payload[0..4]),
@@ -114,9 +129,10 @@ async fn receive_piece_blocks(
         //? Send next request to always have 5 requests in flight
         if let Some(message) = piece_blocks_messages.next() {
             stream
-                .write(&message)
+                .write_all(&message)
                 .await
                 .expect("Failed to send message");
+            println!("Sent next message {:?}", message);
         }
     }
     blocks
@@ -164,9 +180,11 @@ fn bytes_to_u32(input: &[u8]) -> u32 {
         | (input[3] as u32)
 }
 
-pub async fn receive_message(mut stream: TcpStream) -> (Message, TcpStream) {
-    let message_length: u32 = stream.read_u32().await.unwrap();
-    let message_id = stream.read_u8().await.unwrap();
+pub async fn receive_message(stream: &mut TcpStream) -> Result<Message, std::io::Error> {
+    let message_length: u32 = stream.read_u32().await?;
+    println!("Message length: {}", message_length);
+    let message_id = stream.read_u8().await?;
+    println!("Message id: {}", message_id);
 
     let msg = if message_length > 1 {
         let mut msg = vec![0; message_length as usize - 1];
@@ -185,7 +203,9 @@ pub async fn receive_message(mut stream: TcpStream) -> (Message, TcpStream) {
         payload: msg,
     };
 
-    (message, stream)
+    println!("Confirm: {:?}", message.id);
+
+    Ok(message)
 }
 
 #[derive(Debug, Clone)]
