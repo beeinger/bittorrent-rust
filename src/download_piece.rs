@@ -6,7 +6,6 @@ use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
-use crate::info::Metadata;
 use crate::{handshake, info, peers};
 
 const BLOCK_SIZE: u32 = 16 * 1_024;
@@ -21,8 +20,8 @@ pub async fn download_piece(
     let piece_hashes = metadata.info.get_piece_hashes();
 
     assert!(piece_index < piece_hashes.len(), "Piece index out of range");
-
     let piece_hash = &piece_hashes[piece_index];
+    let piece_index = piece_index as u32;
 
     //? Handshake
     let (_, mut stream) = handshake::get_handshake(metadata.clone(), peers[0].as_str()).await;
@@ -41,17 +40,25 @@ pub async fn download_piece(
     let message = receive_message(&mut stream).await?;
     assert!(message.id == 1);
 
+    let pieces_count =
+        (metadata.info.length as f32 / metadata.info.piece_length as f32).ceil() as u32;
+    let piece_length = if piece_index == pieces_count - 1 {
+        metadata.info.length - (piece_index * metadata.info.piece_length)
+    } else {
+        metadata.info.piece_length
+    };
+
     //? Piece blocks messages to send
-    let piece_blocks_messages = get_piece_blocks_messages(&metadata, piece_index as u32);
+    let piece_blocks_messages = get_piece_blocks_messages(piece_index, piece_length);
 
     //? Received piece blocks
     let piece_blocks = receive_piece_blocks(&mut stream, piece_blocks_messages).await;
 
     //? Combine piece blocks into piece=
-    let mut piece = vec![0; metadata.info.piece_length as usize];
+    let mut piece = vec![0; piece_length as usize];
     for block_enum in piece_blocks.iter().enumerate() {
         let block = block_enum.1.clone().unwrap_or(Block {
-            piece_index: piece_index as u32,
+            piece_index,
             begin: block_enum.0 as u32 * BLOCK_SIZE,
             block: vec![0; BLOCK_SIZE as usize],
         });
@@ -71,11 +78,11 @@ pub async fn download_piece(
     let hash: [u8; 20] = hasher.finalize().into();
     let hash = hex::encode(hash);
 
+    assert_eq!(hash, *piece_hash, "Hashes do not match");
+
     tokio::fs::write(output_path, piece.clone())
         .await
         .expect("Failed to write piece");
-
-    assert_eq!(hash, *piece_hash, "Hashes do not match");
 
     Ok(())
 }
@@ -95,7 +102,6 @@ async fn receive_piece_blocks(
                 .write_all(&message)
                 .await
                 .expect("Failed to send message");
-            println!("Sent message {:?}", message);
         }
     }
 
@@ -132,26 +138,26 @@ async fn receive_piece_blocks(
                 .write_all(&message)
                 .await
                 .expect("Failed to send message");
-            println!("Sent next message {:?}", message);
         }
     }
     blocks
 }
 
-fn get_piece_blocks_messages(metadata: &Metadata, piece_index: u32) -> Vec<Vec<u8>> {
-    let piece_length = metadata.info.piece_length;
+fn get_piece_blocks_messages(piece_index: u32, piece_length: u32) -> Vec<Vec<u8>> {
     let chunks: u32 = (piece_length as f64 / BLOCK_SIZE as f64).ceil() as u32;
 
     let mut messages_to_send = Vec::new();
 
     for i in 0..chunks {
-        let u32_payload = &[piece_index, i * BLOCK_SIZE, {
+        let u32_payload = &[
+            piece_index,
+            i * BLOCK_SIZE,
             if i == chunks - 1 {
                 piece_length - (i * BLOCK_SIZE)
             } else {
                 BLOCK_SIZE
-            }
-        }];
+            },
+        ];
         let payload = u32_slice_to_bytes(u32_payload);
         let mut message = u32_slice_to_bytes(&[payload.len() as u32]);
         message.push(6);
@@ -182,9 +188,7 @@ fn bytes_to_u32(input: &[u8]) -> u32 {
 
 pub async fn receive_message(stream: &mut TcpStream) -> Result<Message, std::io::Error> {
     let message_length: u32 = stream.read_u32().await?;
-    println!("Message length: {}", message_length);
     let message_id = stream.read_u8().await?;
-    println!("Message id: {}", message_id);
 
     let msg = if message_length > 1 {
         let mut msg = vec![0; message_length as usize - 1];
@@ -202,8 +206,6 @@ pub async fn receive_message(stream: &mut TcpStream) -> Result<Message, std::io:
         id: message_id,
         payload: msg,
     };
-
-    println!("Confirm: {:?}", message.id);
 
     Ok(message)
 }
