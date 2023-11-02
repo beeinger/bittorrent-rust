@@ -44,4 +44,11 @@ pub enum Commands {
         #[arg(short, long, value_name = "OUTPUT_PATH")]
         output_path: PathBuf,
     },
+    Download {
+        /// A torrent file to decode
+        torrent_file: PathBuf,
+        /// Output path
+        #[arg(short, long, value_name = "OUTPUT_PATH")]
+        output_path: PathBuf,
+    },
 }

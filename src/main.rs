@@ -1,8 +1,10 @@
 use clap::Parser;
 use serde_bencode::from_bytes;
+use tokio::sync::RwLock;
 
 mod cli;
 mod decode;
+mod download;
 mod download_piece;
 mod handshake;
 mod info;
@@ -10,6 +12,7 @@ mod peers;
 
 use cli::Cli;
 use decode::BencodeValue;
+use download::download;
 use download_piece::download_piece;
 use handshake::get_handshake;
 use info::get_info;
@@ -26,17 +29,17 @@ async fn main() {
                 .expect("Invalid bencoded value")
                 .to_json()
         ),
-        Some(cli::Commands::Info { torrent_file }) => println!("{}", get_info(torrent_file)),
+        Some(cli::Commands::Info { torrent_file }) => println!("{}", get_info(&torrent_file)),
         Some(cli::Commands::Peers { torrent_file }) => {
             println!("{}", {
-                let metadata = info::get_info(torrent_file);
-                get_peers(metadata).await.join("\n")
+                let metadata = RwLock::new(info::get_info(&torrent_file));
+                get_peers(&metadata).await.join("\n")
             })
         }
         Some(cli::Commands::Handshake { torrent_file, peer }) => {
             println!("Peer ID: {}", {
-                let metadata = info::get_info(torrent_file);
-                get_handshake(metadata, &peer).await.0
+                let metadata = RwLock::new(info::get_info(&torrent_file));
+                get_handshake(&metadata, &peer).await.0
             })
         }
         Some(cli::Commands::DownloadPiece {
@@ -44,7 +47,7 @@ async fn main() {
             piece_index,
             output_path,
         }) => {
-            download_piece(torrent_file, piece_index, output_path.clone())
+            download_piece(&torrent_file, piece_index, &output_path)
                 .await
                 .expect("Failed to download piece");
             println!(
@@ -53,6 +56,19 @@ async fn main() {
                 output_path.to_str().unwrap()
             );
         }
-        None => println!("No command provided"),
+        Some(cli::Commands::Download {
+            torrent_file,
+            output_path,
+        }) => {
+            download(&torrent_file, &output_path)
+                .await
+                .expect("Failed to download");
+            println!(
+                "Downloaded {} to {}.",
+                torrent_file.to_str().unwrap(),
+                output_path.to_str().unwrap()
+            );
+        }
+        None => rdza::rdza! {kurwa!("Podaj jakąś komendę debulu...")},
     }
 }

@@ -2,8 +2,10 @@ use crate::info::Metadata;
 use serde::{self, Deserialize, Serialize};
 use serde_bencode::from_bytes;
 use serde_bytes::ByteBuf;
+use tokio::sync::RwLock;
 
-pub async fn get_peers(metadata: Metadata) -> Vec<String> {
+pub async fn get_peers(metadata: &RwLock<Metadata>) -> Vec<String> {
+    let metadata = metadata.read().await;
     let dicover_peers_query = DiscoverPeersQuery::new(
         "21372137696921372137".to_string(),
         6881,

@@ -5,9 +5,9 @@ use sha1::{Digest, Sha1};
 use std::fs;
 
 use std::fmt::Display;
-use std::path::PathBuf;
+use std::path::Path;
 
-pub fn get_info(path: PathBuf) -> Metadata {
+pub fn get_info(path: &Path) -> Metadata {
     let contents: Vec<u8> = fs::read(path).unwrap();
     from_bytes::<Metadata>(&contents).unwrap()
 }

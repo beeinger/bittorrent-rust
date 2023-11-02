@@ -1,11 +1,12 @@
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
+use tokio::sync::RwLock;
 
 use crate::info::Metadata;
 
-pub async fn get_handshake(metadata: Metadata, peer: &str) -> (String, TcpStream) {
-    let handshake = construct_handshake(metadata);
+pub async fn get_handshake(metadata: &RwLock<Metadata>, peer: &str) -> (String, RwLock<TcpStream>) {
+    let handshake = construct_handshake(metadata).await;
 
     let mut stream = TcpStream::connect(peer)
         .await
@@ -27,16 +28,16 @@ pub async fn get_handshake(metadata: Metadata, peer: &str) -> (String, TcpStream
             .map(|byte| format!("{:02x}", byte))
             .collect::<Vec<String>>()
             .join(""),
-        stream,
+        RwLock::new(stream),
     )
 }
 
-fn construct_handshake(metadata: Metadata) -> Vec<u8> {
+async fn construct_handshake(metadata: &RwLock<Metadata>) -> Vec<u8> {
     let mut handshake = Vec::new();
     handshake.push(19);
     handshake.extend(b"BitTorrent protocol");
     handshake.extend(vec![0; 8]);
-    handshake.extend(metadata.info.get_hash());
+    handshake.extend(metadata.write().await.info.get_hash());
     handshake.extend(b"21372137696921372137");
     handshake
 }
